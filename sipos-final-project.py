@@ -22,6 +22,7 @@ def create_tables():
     cur = dbconn.cursor()
 
     # SQL to create the tables
+    # nid and ids in other tables are the same from setting up the CSV instead of auto generating
     create_sql = """
         DROP TABLE IF EXISTS salaries, neighborhoods;
 
@@ -153,6 +154,23 @@ def print_column_names(neighborhoods_df, salaries_df):
     print()
 
 
+def average_pop():
+    dbconn = psycopg2.connect(connstring)
+    cur = dbconn.cursor()
+    avg_sql = """
+        SELECT ROUND(AVG(pop_estimate),2) FROM neighborhoods;
+    """
+
+    cur.execute(avg_sql)
+    records = cur.fetchall()
+    # TODO if I have time: fix formatting
+    print(records)
+
+
+def salary_stats():
+    print("Salary stats. ")
+
+
 def create_menu():
     print(
         """
@@ -163,7 +181,7 @@ def create_menu():
     3. See a preview of the tables
     4. List all neighborhoods and populations
     5. Print the average population of Pittsburgh neighborhoods
-    6. Placeholder
+    6. Print stats on neighborhood salary data
     7. Quit
     """
     )
@@ -174,7 +192,11 @@ def create_menu():
         insert_csv()
     elif user_input == "3":
         print_column_names(neighborhoods_df, salaries_df)
+    elif user_input == "5":
+        average_pop()
     elif user_input == "6":
+        salary_stats()
+    elif user_input == "7":
         print(
             """
         Goodbye! For more interesting data about Pittsburgh check out https://data.wprdc.org/!
