@@ -167,10 +167,6 @@ def average_pop():
     print(records)
 
 
-def salary_stats():
-    print("Salary stats. ")
-
-
 def create_menu():
     print(
         """
