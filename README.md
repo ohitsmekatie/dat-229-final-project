@@ -1,2 +1,10 @@
 # dat-229-final-project
-Final project for Tabular &amp; Linked Data (DAT-229)
+
+## Overview
+
+This project uses data from WPRDC site and creates a program that let's you explore various aspects of Pittsburgh neighborhoods:
+1. Population per area
+2. Salaries per area
+3. Vegitation per area 
+
+
