@@ -67,7 +67,7 @@ def insert_csv():
     cur = dbconn.cursor()
 
     with open("neighborhoods_pop.csv", "r") as f:
-        # skip the header row so it uses the names I have above
+        # skip the header row so it uses the names I have above more easily
         next(f)
         cur.copy_from(f, "neighborhoods", sep=",")
 
@@ -98,30 +98,28 @@ def select_all():
     """
 
     cur.execute(neighborhood_all)
-    records = cur.fetchall()
+    r = cur.fetchall()
+    records = pd.DataFrame(r)
     dbconn.commit()
     print()
     print("Printing a sample of the neighborhoods table:")
     print()
-    for record in records:
-        print(record)
+    print(records)
     print()
-
     # select everything from the salaries table, limiting it to 5
     salaries_all = """
         SELECT * FROM salaries LIMIT 5;
     """
     cur.execute(salaries_all)
-    records2 = cur.fetchall()
+    r2 = cur.fetchall()
+    records2 = pd.DataFrame(r)
     dbconn.commit()
     cur.close()
     dbconn.close()
     print()
     print("Printing a sample of the salaries table:")
     print()
-    for record in records2:
-        print(record)
-    print()
+    print(records2)
     # take user back to main menu
     create_menu()
 
@@ -152,6 +150,7 @@ def print_column_names(neighborhoods_df, salaries_df):
 
     print()
     print()
+    create_menu()
 
 
 def average_pop():
@@ -162,8 +161,25 @@ def average_pop():
     """
 
     cur.execute(avg_sql)
-    records = cur.fetchall()
+    r = cur.fetchall()
+    records = pd.DataFrame(r)
     # TODO if I have time: fix formatting
+    print("The average salary across all Pittsburgh neighborhoods is", records[0][0])
+
+    create_menu()
+
+
+def top_5_population():
+    dbconn = psycopg2.connect(connstring)
+    cur = dbconn.cursor()
+
+    top_sql = """
+        SELECT neighborhood_name as name, pop_estimate as populuation FROM neighborhoods ORDER BY pop_estimate DESC LIMIT 5;
+    """
+
+    cur.execute(top_sql)
+    r = cur.fetchall()
+    records = pd.DataFrame(r)
     print(records)
 
 
@@ -177,8 +193,9 @@ def create_menu():
     3. See a preview of the tables
     4. List all neighborhoods and populations
     5. Print the average population of Pittsburgh neighborhoods
-    6. Print stats on neighborhood salary data
-    7. Quit
+    6. Print out the top 5 neighborhoods with highest recorded population
+    7. Print stats on neighborhood salary data
+    8. Quit
     """
     )
     user_input = input("What would you like to do: ")
@@ -187,12 +204,12 @@ def create_menu():
     elif user_input == "2":
         insert_csv()
     elif user_input == "3":
-        print_column_names(neighborhoods_df, salaries_df)
+        select_all()
     elif user_input == "5":
         average_pop()
     elif user_input == "6":
-        salary_stats()
-    elif user_input == "7":
+        top_5_population()
+    elif user_input == "8":
         print(
             """
         Goodbye! For more interesting data about Pittsburgh check out https://data.wprdc.org/!
@@ -206,3 +223,9 @@ def main():
 
 
 main()
+
+# things left todo
+# matplotlib or some kind of graph
+# erd diagram
+# joining tables
+# bring in tree data
