@@ -1,9 +1,6 @@
-# import necessary modules
-
 import psycopg2
 import csv
 from csv import reader
-import os
 import pandas as pd
 
 # db connection string
@@ -12,8 +9,7 @@ connstring = "host=localhost dbname=pghdata user=pyuser password=passwrd"
 # creating dataframes outside of my functions so I can use them for various analyses where I don't want to use SQL directly from the DB
 
 neighborhoods_df = pd.read_csv("neighborhoods_pop.csv")
-salaries_df = pd.read_csv("pgh_salaries.csv")
-
+pgh_311_df = pd.read_csv("pgh_311_2021.csv")
 
 def create_tables():
     # establish a connection with the connstring variable set above
@@ -22,31 +18,24 @@ def create_tables():
     cur = dbconn.cursor()
 
     # SQL to create the tables
-    # nid and ids in other tables are the same from setting up the CSV instead of auto generating
     create_sql = """
-        DROP TABLE IF EXISTS salaries, neighborhoods;
+        DROP TABLE IF EXISTS pgh_311, neighborhoods;
 
         CREATE TABLE neighborhoods (
-            nid INT,
-			neighborhood_name VARCHAR(50) NOT NULL,
-            pop_estimate INT
-        );
-
-        CREATE TABLE salaries (
-            snid INT,
+            id INT,
             neighborhood_name VARCHAR(50) NOT NULL,
-            total_salary_count INT,
-            total_less_10 INT,
-            total_10_to_29 INT,
-            total_30_to_49 INT,
-            total_50_to_74 INT,
-            total_75_to_99 INT,
-            total_100_to_124 INT,
-            total_125_to_149 INT,
-            total_above_150 INT
-        );
+            pop_estimate INT
+            );
+            
+        CREATE TABLE pgh_311 (
+            id INT,
+            created_on VARCHAR(50),
+            request_type VARCHAR(50),
+            request_origin VARCHAR(50),
+            neighborhood_name VARCHAR(50)  
+            );
     """
-
+    
     # execute the create table SQL
     cur.execute(create_sql)
     # commit changes
@@ -57,8 +46,8 @@ def create_tables():
     print()
     print("The neighborhood table has been initialized.")
     print()
-    print("The salaries table has been initialized")
-    print()
+    print("The 311 data (2021) table has been initialized.")
+
     create_menu()
 
 
@@ -67,25 +56,27 @@ def insert_csv():
     cur = dbconn.cursor()
 
     with open("neighborhoods_pop.csv", "r") as f:
-        # skip the header row so it uses the names I have above more easily
+        # skip the header row so it doesn't throw a type error 
         next(f)
-        cur.copy_from(f, "neighborhoods", sep=",")
+        cur.copy_from(f, "neighborhoods", sep = ",", columns = ("id", "neighborhood_name", "pop_estimate"))
 
     dbconn.commit()
     print()
     print("The neighborhood table data has been inserted from the csv.")
     print()
-
-    with open("pgh_salaries.csv", "r") as f:
+    
+    with open("pgh_311_2021.csv", "r") as f:
+        # skip the header row so it doesn't throw a type error 
         next(f)
-        cur.copy_from(f, "salaries", sep=",")
-
+        cur.copy_from(f, "pgh_311", sep = ",", columns = ("id", "created_on", "request_type", "request_origin", "neighborhood_name"))
+    
     dbconn.commit()
-    cur.close()
-    dbconn.close()
-    print("The salary table data has been inserted from the csv.")
     print()
-
+    print("The 311 pgh table data has been inserted from the csv.")
+    print()
+    
+    dbconn.close()
+    cur.close()
     create_menu()
 
 
@@ -106,96 +97,189 @@ def select_all():
     print()
     print(records)
     print()
-    # select everything from the salaries table, limiting it to 5
-    salaries_all = """
-        SELECT * FROM salaries LIMIT 5;
-    """
-    cur.execute(salaries_all)
-    r2 = cur.fetchall()
-    records2 = pd.DataFrame(r)
-    dbconn.commit()
-    cur.close()
-    dbconn.close()
-    print()
-    print("Printing a sample of the salaries table:")
-    print()
-    print(records2)
-    # take user back to main menu
-    create_menu()
 
-
-def print_column_names(neighborhoods_df, salaries_df):
-    # print column names of neighborhood table
-    print(
-        """
-    ########## NEIGHBORHOOD TABLE COLUMNS ##########
-    ################################################
-    """
-    )
-    for col in neighborhoods_df.columns:
-        print(col)
-
-    # print column names of salaries table
-    print(
-        """
-    ########## SALARY TABLE COLUMNS ##########
-    ##########################################
-
-    Note: each column represents a salary range - outside of id, neighborhood, and total and the fields are the total count of humans in a given area that falls into that range
-    """
-    )
-
-    for col in salaries_df.columns:
-        print(col)
-
-    print()
-    print()
-    create_menu()
-
-
-def average_pop():
-    dbconn = psycopg2.connect(connstring)
-    cur = dbconn.cursor()
-    avg_sql = """
-        SELECT ROUND(AVG(pop_estimate),2) FROM neighborhoods;
+    pgh_311_all = """
+        SELECT * FROM pgh_311 LIMIT 5;
     """
 
-    cur.execute(avg_sql)
+    cur.execute(pgh_311_all)
     r = cur.fetchall()
     records = pd.DataFrame(r)
-    # TODO if I have time: fix formatting
-    print("The average salary across all Pittsburgh neighborhoods is", records[0][0])
-
+    dbconn.commit()
+    print()
+    print("Printing a sample of the 311 data table:")
+    print()
+    print(records)
+    print()
     create_menu()
 
 
 def top_5_population():
     dbconn = psycopg2.connect(connstring)
     cur = dbconn.cursor()
-
+    
+    print()
+    print("Top 5 neighborhoods by population:")
+    print()
     top_sql = """
-        SELECT neighborhood_name as name, pop_estimate as populuation FROM neighborhoods ORDER BY pop_estimate DESC LIMIT 5;
+    
+    SELECT neighborhood_name as name, cast(pop_estimate as int) as populuation FROM neighborhoods ORDER BY cast(pop_estimate as int) DESC LIMIT 5;
+    
     """
 
     cur.execute(top_sql)
     r = cur.fetchall()
     records = pd.DataFrame(r)
     print(records)
+    create_menu()
+
+    
+def top_10_requests():
+    dbconn = psycopg2.connect(connstring)
+    cur = dbconn.cursor()
+    
+    print()
+    print("Top 10 request types with counts:")
+    print()
+    
+    top_sql = """
+    
+    SELECT request_type, COUNT(request_type) from pgh_311 GROUP BY 1 ORDER BY 2 DESC LIMIT 10;
+    
+    """
+    
+    cur.execute(top_sql)
+    r = cur.fetchall()
+    records = pd.DataFrame(r)
+    print(records)
+    create_menu()
 
 
+def requests_by_month():
+    dbconn = psycopg2.connect(connstring)
+    cur = dbconn.cursor()
+    
+    print()
+    print("Request counts grouped by month: ")
+    print()
+    month_sql = """
+    
+    SELECT DATE_TRUNC('month', DATE(created_on)), COUNT(request_type) from pgh_311 GROUP BY 1 ORDER BY 2 DESC;
+    
+    """
+    
+    cur.execute(month_sql)
+    r = cur.fetchall()
+    records = pd.DataFrame(r)
+    print(records)
+    create_menu()
+
+    
+def requests_by_loc():    
+    dbconn = psycopg2.connect(connstring)
+    cur = dbconn.cursor()
+    
+    print()
+    print("Request counts by neighborhood")
+    print()
+    neigh_counts = """
+    
+    SELECT neighborhood_name, COUNT(id) FROM pgh_311 WHERE neighborhood_name is not NULL GROUP BY 1 ORDER BY 2 DESC;
+    
+    """
+    
+    cur.execute(neigh_counts)
+    r = cur.fetchall()
+    records = pd.DataFrame(r)
+    print(records)
+    create_menu()
+    
+def pop_and_requests():
+    dbconn = psycopg2.connect(connstring)
+    cur = dbconn.cursor()
+    
+    print("""
+    
+    Squirrel Hill (South) population and number of requests in 2021 so far:
+    
+    """)
+    joined_sql = """
+    
+    SELECT n.neighborhood_name, n.pop_estimate, COUNT(p.*) 
+    FROM neighborhoods n 
+    INNER JOIN pgh_311 p 
+    ON n.neighborhood_name = p.neighborhood_name
+    WHERE n.neighborhood_name = 'Squirrel Hill South'
+    GROUP BY 1,2
+        
+    """
+    
+    cur.execute(joined_sql)
+    r = cur.fetchall()
+    records = pd.DataFrame(r)
+    print(records)
+    create_menu()
+
+    
+def show_bar():
+
+    # NOTE TO MR D: something is happening where my charts aren't printing until after the program ends intermittently. 
+    # Just noting in case this happens to you. Haven't been able to debug since it's only happened a few times so I think it's a notebook problem
+    dbconn = psycopg2.connect(connstring)
+    cur = dbconn.cursor()
+    
+    # request bar chart 
+    request_sql = """
+
+    SELECT request_type, COUNT(request_type) from pgh_311 GROUP BY 1 ORDER BY 2 DESC LIMIT 25;
+
+    """
+
+    cur.execute(request_sql)
+    r = cur.fetchall()
+    records = pd.DataFrame(r, columns = ["count_of_requests", "request_type"])
+    
+    ax1 = records.plot.bar(x = "count_of_requests", y = "request_type")
+    
+    # population bar chart 
+    
+    pop_sql = """
+
+    SELECT neighborhood_name, pop_estimate FROM neighborhoods ORDER BY 2 DESC LIMIT 25;
+
+    """
+
+    cur.execute(pop_sql)
+    r2 = cur.fetchall()
+    records2 = pd.DataFrame(r, columns = ["neighborhood_name", "pop_estimate"])
+    
+    ax1 = records2.plot.bar(x = "neighborhood_name", y = "pop_estimate", color ="green")
+    
+   
+    
+    
+    create_menu()
+    
 def create_menu():
+    print()
     print(
         """
-    Hello! This program let's you explore data about Pittsburgh neighborhoods. Data is this program came from WPRDC (https://data.wprdc.org/).
+    Hello! This program let's you explore data about Pittsburgh neighborhoods. 
+    To start, we are going to look at population and 311 call data from 2021. There's so many awesome stats to pull
+    Data is this program came from WPRDC (https://data.wprdc.org/).
+    
+    
     Enter the number choice of what you'd like to do.
     1. Initialize the tables
     2. Insert records
     3. See a preview of the tables
-    4. List all neighborhoods and populations
-    5. Print the average population of Pittsburgh neighborhoods
-    6. Print out the top 5 neighborhoods with highest recorded population
-    7. Print stats on neighborhood salary data
-    8. Quit
+    4. Show population and request counts from the highest populated neighborhood in Pittsburgh
+    5. Show count of 311 requests by month
+    6. Shoq top 5 neighborhoods with highest recorded population
+    7. Show top 10 311 request types in 2021 with counts 
+    8. Show 311 request counts by neighborhood 
+    9. Show a bar chart of top 25 311 request types with counts for 2021
+    10. Quit
     """
     )
     user_input = input("What would you like to do: ")
@@ -205,11 +289,19 @@ def create_menu():
         insert_csv()
     elif user_input == "3":
         select_all()
+    elif user_input == "4":
+        pop_and_requests()
     elif user_input == "5":
-        average_pop()
+        requests_by_month()
     elif user_input == "6":
         top_5_population()
+    elif user_input == "7":
+        top_10_requests()
     elif user_input == "8":
+        requests_by_loc()
+    elif user_input == "9":
+        show_bar()
+    elif user_input == "10":
         print(
             """
         Goodbye! For more interesting data about Pittsburgh check out https://data.wprdc.org/!
@@ -224,8 +316,4 @@ def main():
 
 main()
 
-# things left todo
-# matplotlib or some kind of graph
-# erd diagram
-# joining tables
-# bring in tree data
+
