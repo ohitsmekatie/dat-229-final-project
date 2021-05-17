@@ -1,3 +1,10 @@
+"""
+Katie Sipos
+Tabular and Linked Data - Spring 2021
+Overview: this program uses 2 datasets from WPRDC (population & 311 data) and performs some basic analysis using SQL
+Notes: the first version of this program is a bit repetetive. As a follow i'll add varied analysis and implement DRY principles in the future!
+"""
+
 import psycopg2
 import csv
 from csv import reader
@@ -56,6 +63,8 @@ def insert_csv():
     dbconn = psycopg2.connect(connstring)
     cur = dbconn.cursor()
 
+    # cursor function copy_from to insert DB records
+    # https://www.psycopg.org/docs/cursor.html
     with open("neighborhoods_pop.csv", "r") as f:
         # skip the header row so it doesn't throw a type error
         next(f)
@@ -115,6 +124,7 @@ def select_all():
     print(records)
     print()
 
+    # same thing but for the 311 dataset
     pgh_311_all = """
         SELECT * FROM pgh_311 LIMIT 5;
     """
@@ -134,7 +144,7 @@ def select_all():
 def top_5_population():
     dbconn = psycopg2.connect(connstring)
     cur = dbconn.cursor()
-
+    # SQL for getting top 5 neighborhoods by population
     print()
     print("Top 5 neighborhoods by population:")
     print()
@@ -159,6 +169,7 @@ def top_10_requests():
     print("Top 10 request types with counts:")
     print()
 
+    # SQL for getting the top 10 request types across all neighborhoods limited to 10 so as not
     top_sql = """
     
     SELECT request_type, COUNT(request_type) from pgh_311 GROUP BY 1 ORDER BY 2 DESC LIMIT 10;
@@ -179,6 +190,7 @@ def requests_by_month():
     print()
     print("Request counts grouped by month: ")
     print()
+    # top requests by month using date trunc to group by month
     month_sql = """
     
     SELECT DATE_TRUNC('month', DATE(created_on)), COUNT(request_type) from pgh_311 GROUP BY 1 ORDER BY 2 DESC;
@@ -199,6 +211,8 @@ def requests_by_loc():
     print()
     print("Request counts by neighborhood")
     print()
+    # get request counts by location
+
     neigh_counts = """
     
     SELECT neighborhood_name, COUNT(id) FROM pgh_311 WHERE neighborhood_name is not NULL GROUP BY 1 ORDER BY 2 DESC;
@@ -223,6 +237,8 @@ def pop_and_requests():
     
     """
     )
+
+    # join the 2 tables to get pop estimate and number of requests for a given location
     joined_sql = """
     
     SELECT n.neighborhood_name, n.pop_estimate, COUNT(p.*) 
@@ -248,7 +264,7 @@ def show_bar():
     dbconn = psycopg2.connect(connstring)
     cur = dbconn.cursor()
 
-    # request bar chart
+    # request bar chart SQL and chart
     request_sql = """
 
     SELECT request_type, COUNT(request_type) from pgh_311 GROUP BY 1 ORDER BY 2 DESC LIMIT 25;
@@ -261,7 +277,7 @@ def show_bar():
 
     ax1 = records.plot.bar(x="count_of_requests", y="request_type")
 
-    # population bar chart
+    # population bar chart SQL and chart
 
     pop_sql = """
 
@@ -282,6 +298,7 @@ def create_menu():
     print()
     print(
         """
+    
     Enter the number choice of what you'd like to do.
     1. Initialize the tables
     2. Insert records
@@ -326,11 +343,14 @@ def create_menu():
 def main():
     print()
     print(
-        """Hello! This program let's you explore data about Pittsburgh neighborhoods. 
-    To start, we are going to look at population and 311 call data from 2021. 
-    Data is this program came from WPRDC (https://data.wprdc.org/).)"""
+        """
+        Hello! This program let's you explore data about Pittsburgh neighborhoods. 
+    To start, we are going to look at population and 311 call data from 2021. There's so many awesome stats to pull
+    Data is this program came from WPRDC (https://data.wprdc.org/).
+    
+    
+    """
     )
-
     create_menu()
 
 
